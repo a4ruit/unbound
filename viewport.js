@@ -18,6 +18,11 @@
 
   var CHAR_SIZE = 1;    // character size in world units (a 1-unit cube)
 
+  // Match the Unity look: black void, light platforms, light character.
+  var FLOOR_COLOR = '#f2efe9';
+  var CHAR_COLOR = '#ffffff';
+  var CHAR_EDGE = 'rgba(0, 0, 0, 0.35)';   // keeps a white cube readable on a white floor
+
   // ---- state streamed from Unity ------------------------------------------
   var seam = 0;
   var floorY = 0;
@@ -43,7 +48,7 @@
 
     // The ground, continuing past the monitor.
     var groundTop = py(floorY);
-    ctx.fillStyle = '#ededed';
+    ctx.fillStyle = FLOOR_COLOR;
     ctx.fillRect(0, groundTop, W, H - groundTop);
 
     if (haveData) {
@@ -54,8 +59,15 @@
       // Drawn even when partly off-screen, so it straddles the seam as it
       // crosses instead of popping into view.
       var size = CHAR_SIZE * scale;
-      ctx.fillStyle = '#111111';
-      ctx.fillRect(px(shown.x) - size / 2, py(shown.y) - size / 2, size, size);
+      var cx = px(shown.x) - size / 2;
+      var cy = py(shown.y) - size / 2;
+
+      ctx.fillStyle = CHAR_COLOR;
+      ctx.fillRect(cx, cy, size, size);
+
+      ctx.strokeStyle = CHAR_EDGE;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + 0.5, cy + 0.5, size - 1, size - 1);
     }
 
     requestAnimationFrame(frame);
