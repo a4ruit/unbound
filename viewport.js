@@ -107,15 +107,29 @@
   var lastTiltSent = 0;
   var TILT_HZ = 30;
 
+  // Whatever angle the phone is at when you tap becomes "flat". Without this
+  // the phone is never at exactly 0 degrees, so gravity leans permanently and
+  // the cube slides forever.
+  var tiltZero = null;
+
+  // Ignore tiny angles, so sensor noise does not nudge the cube.
+  var DEADZONE = 0.06;
+
   function onTilt(e) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    var g = (typeof e.gamma === 'number') ? e.gamma : 0;
+    if (tiltZero === null) tiltZero = g;      // first reading after a tap
 
     var now = performance.now();
     if (now - lastTiltSent < 1000 / TILT_HZ) return;
     lastTiltSent = now;
 
-    // gamma is the left/right tilt in degrees. 45 degrees = full lean.
-    var x = Math.max(-1, Math.min(1, (e.gamma || 0) / 45));
+    // gamma is the left/right tilt in degrees. 45 degrees from flat = full lean.
+    var x = (g - tiltZero) / 45;
+    if (Math.abs(x) < DEADZONE) x = 0;
+    x = Math.max(-1, Math.min(1, x));
+
     ws.send(JSON.stringify({ type: 'tilt', x: x }));
   }
 
@@ -138,7 +152,12 @@
     else { statusEl.classList.add('hidden'); }
   }
 
-  window.addEventListener('pointerdown', enableTilt);
+  // First tap enables tilt. Every tap re-zeroes it, so you can recentre at any
+  // time by tapping while holding the phone how you want "flat" to feel.
+  window.addEventListener('pointerdown', function () {
+    tiltZero = null;
+    enableTilt();
+  });
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
