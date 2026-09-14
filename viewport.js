@@ -74,9 +74,11 @@
   }
 
   // ---- connection ----------------------------------------------------------
+  var ws = null;
+
   function connect() {
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var ws = new WebSocket(proto + '//' + location.host + '/ws');
+    ws = new WebSocket(proto + '//' + location.host + '/ws');
 
     ws.onmessage = function (ev) {
       var msg;
@@ -92,12 +94,51 @@
         shown.x = target.x;
         shown.y = target.y;
         haveData = true;
-        statusEl.classList.add('hidden');
+        updateStatus();
       }
     };
 
     ws.onclose = function () { setTimeout(connect, 2000); };
   }
+
+  // ---- tilt: the phone tips gravity in Unity -------------------------------
+  // Tap anywhere to enable, so there is no button breaking the illusion.
+  var tiltOn = false;
+  var lastTiltSent = 0;
+  var TILT_HZ = 30;
+
+  function onTilt(e) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    var now = performance.now();
+    if (now - lastTiltSent < 1000 / TILT_HZ) return;
+    lastTiltSent = now;
+
+    // gamma is the left/right tilt in degrees. 45 degrees = full lean.
+    var x = Math.max(-1, Math.min(1, (e.gamma || 0) / 45));
+    ws.send(JSON.stringify({ type: 'tilt', x: x }));
+  }
+
+  function enableTilt() {
+    if (tiltOn) return;
+    tiltOn = true;
+
+    // iOS only grants motion access from inside a tap.
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission();
+    }
+    window.addEventListener('deviceorientation', onTilt);
+    updateStatus();
+  }
+
+  function updateStatus() {
+    if (!haveData) { statusEl.textContent = 'waiting for Unity'; statusEl.classList.remove('hidden'); }
+    else if (!tiltOn) { statusEl.textContent = 'tap to enable tilt'; statusEl.classList.remove('hidden'); }
+    else { statusEl.classList.add('hidden'); }
+  }
+
+  window.addEventListener('pointerdown', enableTilt);
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
